@@ -13,7 +13,7 @@
 #define LED_Yaxis	0x04	// y-axis/vertical LED array (local axis) (Timer 0 output) P1 output!
 #define BUTTON_BIT 	0x08	// button bit
 
-#define CS 0x10			//UCB0STE P1sel + p1sel2 both 1
+#define CS 0x10			//Chip select port
 #define SCLK 0x20		//UCB0CLK 1 + 1
 #define SDO  0x40		//UCB0SOMI 1 + 1
 #define SDI 0x80		//UCB0SIMO 1 + 1
@@ -25,8 +25,8 @@
 #define DATAZ0 0x36
 #define DATAZ1 0x37
 
-#define wait_tm while ((UCB0STAT & UCBUSY));
-#define wait_btw __delay_cycles(10);
+#define wait_tm while ((UCB0STAT & UCBUSY)); // wait for end of transmission
+#define wait_btw __delay_cycles(10);		
 
 volatile char val, xval0, xval1, yval0, yval1, zval0, zval1;	//accelerometer intermediate variables
 volatile char count;				// counting variable to wait for a time for the device being level before turning on the LED.
@@ -38,7 +38,7 @@ void init_adc(void); // adc setup
 void init_timer(void); // timer setup
 void init_button(void); // button setup
 void init_SPI();
-void init_accel(void);
+void init_accel(void);	// set up the accelerometer
 char read_byte(char addr);
 void write_byte(char addr, char b);
 
@@ -170,12 +170,12 @@ void init_SPI(void){
 void init_accel(void){
 	val = read_byte(0x00); //read dev id
 	write_byte(0x2D, 0x08); // set to measurement mode
-	write_byte(0x31, 0x00); // set data format - +/- 2g, right justified with SE
+	write_byte(0x31, 0x00); // set data format - +/- 2g, right justified with sign extended
 
 }
 
 void write_byte(char addr, char b) {
-	P1OUT &= ~CS;
+	P1OUT &= ~CS;  			//CS low to turn on chip
 	while((IFG2&UCB0TXIFG)==0); //wait for TX flag to be set
 	UCB0TXBUF=addr; //put address into TX buffer to write it
 	wait_tm;
@@ -201,7 +201,7 @@ interrupt void WDT_interval_handler(){
 	// send/get the data from the accelerometer
 	xval0 = read_byte(DATAX0);
 	xval1 = read_byte(DATAX1);
-	x_axis = xval0 + (xval1<<8);
+	x_axis = xval0 + (xval1<<8); //concatenate two bytes into an int
 
 	yval0 = read_byte(DATAY0);
 	yval1 = read_byte(DATAY1);
@@ -219,12 +219,12 @@ interrupt void WDT_interval_handler(){
 		TA0CCR1 = (-y_axis*scale + 32768);
 	}
 	else if (x_axis > 170 || x_axis < -170){
-		// it is on its side
+		// turned 90 degrees
 		TA1CCR1 = (z_axis*scale + 32768);
 		TA0CCR1 = (-y_axis*scale + 32768);
 	}
 	else if (y_axis > 170 || y_axis < -170){
-		// on its other side
+		// 90 degree turn on the other axis
 		TA1CCR1 = (x_axis*scale + 32768);
 		TA0CCR1 = (-z_axis*scale + 32768);
 	}
