@@ -1,8 +1,11 @@
 #include "msp430g2553.h"
+
 /*
  * EC450 Final Project
  *	Leveling device
  *	Fall 2013
+ *
+ * Conor McEwen & Patrick W. Crawford
  *
  */
 
@@ -29,7 +32,7 @@
 #define wait_btw __delay_cycles(10);
 
 volatile char val, xval0, xval1, yval0, yval1, zval0, zval1;	//accelerometer intermediate variables
-volatile char count;				// counting variable to wait for a time for the device being level before turning on the LED.
+volatile char count;				// counting variable to wait for a time for the device being level before turning on the center LED.
 const char scale = 200;				// scaling factor to make brightness of LED's vary more over a small range
 const int threshold = 0x1000;		// threshold factor for how off from "flat" it can be while allowing the center LED to turn on
 
@@ -52,7 +55,6 @@ volatile signed int x_axis;
 volatile signed int y_axis;
 volatile signed int z_axis;
 
-
 // main function
 void main(){
 	WDTCTL = WDTPW + WDTTMSEL+ WDTCNTCL + 0; // setup using the watchdog timer, using the 8MHz clock, 00 us /32768
@@ -73,7 +75,8 @@ void main(){
 	P1REN = BUTTON_BIT;
 	P1DIR |= LED_center;	//(BUTTON_BIT+LED_Xaxis+LED_Yaxis+LED_center);
 	P1OUT &= ~LED_center;
-
+	
+	// initialize accelerometer and onboard communication protocols
 	init_SPI();
 	init_accel();
 
@@ -122,7 +125,6 @@ void init_timer(){              // initialization and start of timer
 void init_button(){
 	P1OUT |= BUTTON_BIT; // pullup
 	P1REN |= BUTTON_BIT; // enable resistor
-	//P1IES &= ~BUTTON_BIT; // set for 1->0 transition
 	P1IFG &= ~(BUTTON_BIT);// clear interrupt flag
 	P1IE  |= BUTTON_BIT; // enable interrupt
 }
@@ -136,6 +138,7 @@ void interrupt button_handler(){
 		// reset flag
 		P1IFG &= ~BUTTON_BIT;
 		// here we  set the calibration values
+		// must also consider change from previous calibration offset, and "0" or "level" is 32768
 		xaxis_calibrate = TA1CCR1-32768+xaxis_calibrate;
 		yaxis_calibrate = TA0CCR1-32768+yaxis_calibrate;
 	}
